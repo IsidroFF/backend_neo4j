@@ -6,6 +6,8 @@ services:
     ports:
       - "7474:7474"
       - "7687:7687"
+    environment:
+      - NEO4J_AUTH=none
     networks:
       - backend
 
@@ -20,15 +22,15 @@ services:
 
   backend_app:
     build: .
-    image: node_neo4j_api:v2
+    image: isidroitt/node_neo4j_api:latest
     container_name: "node_app"
     ports:
       - "3000:3000"
     networks:
       - backend
     environment:
-      REDIS_URL: redis_stack://172.21.0.2:6379
-      NEO4J_URL: neo4j://172.21.0.3:7687
+      REDIS_URL: redis_stack://redis_stack:6379
+      NEO4J_URL: neo4j://neo_presentacion:7687
     depends_on:
       - redis_stack
       - neo4j
