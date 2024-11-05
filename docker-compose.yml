@@ -1,0 +1,38 @@
+version: '3.9'
+services:
+  neo4j:
+    image: neo4j
+    container_name: neo_presentacion
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    networks:
+      - backend
+
+  redis_stack:
+    image: redis/redis-stack
+    container_name: redis_stack
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    networks:
+      - backend
+
+  backend_app:
+    build: .
+    image: node_neo4j_api:v2
+    container_name: "node_app"
+    ports:
+      - "3000:3000"
+    networks:
+      - backend
+    environment:
+      REDIS_URL: redis_stack://172.21.0.2:6379
+      NEO4J_URL: neo4j://172.21.0.3:7687
+    depends_on:
+      - redis_stack
+      - neo4j
+
+networks:
+  backend:
+    driver: bridge
