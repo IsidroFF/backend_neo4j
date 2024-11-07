@@ -1,3 +1,49 @@
+### Gestión de Aeropuertos. Una instancia gubernamental requiere una BD que cumpla lo siguiente.
+
+- De cada aeropuerto se desea guardar un id, nombre, ciudad, dirección, número de pistas. En cada aeropuerto trabajan varias empresas autorizadas para hacer uso del aeropuerto.
+``` cypher
+CREATE (a:Aeropuerto {id: 'A1', nombre: 'Aeropuerto Internacional', ciudad: 'Ciudad X', direccion: 'Dirección X', numeroPistas: 4}); 
+```
+
+- Cada empresa cuenta con RFC, nombre, nacionalidad oficial de la empresa, dirección de la sede central, teléfonos y el número de aviones con que cuenta.
+- Existen empresas de tres tipos en función de los vuelos que realizan: nacional, continental e internacional
+- De las empresas nacionales se requiere almacenar el país al que pertenece, que es donde realiza todas las operaciones administrativas y pago de impuestos. Es necesario almacenar si tiene permiso para realizar viajes fuera del país (en algunas ocasiones puede la empresa realizar vuelos internacionales por petición expresa de un cliente)
+```cypher
+CREATE (e:Empresa {RFC: 'RFC1234', nombre: 'AeroLineasX', nacionalidad: 'MX', direccion: 'Dirección Sede X', telefonos: ['+1234567890'], numeroAviones: 15, tipo: 'Nacional', pais: 'México', permisoInternacional: true});
+```
+- De cada empresa continental se requiere almacenar el continente, y los países del continente sobre los que opera.
+```cypher
+CREATE (e:Empresa {RFC: 'RFC1234', nombre: 'AeroLineasX', nacionalidad: 'MX', direccion: 'Dirección Sede X', telefonos: ['+1234567890'], numeroAviones: 15, tipo: 'Continental', pais: 'México', permisoInternacional: true, continente: 'America', paisesDeOperacion: ['MX', 'EUA', 'CA', 'AR', 'CHILE', 'CO']});
+```
+- Una empresa internacional requiere registrar los países en los que no puede operar.
+```cypher
+CREATE (e:Empresa {RFC: 'RFC1234', nombre: 'AeroLineasX', nacionalidad: 'MX', direccion: 'Dirección Sede X', telefonos: ['+1234567890'], numeroAviones: 15, tipo: 'Internacional', pais: 'México', permisoInternacional: true, continente: 'America', paisesDeOperacion: ['MX', 'EUA', 'CA', 'AR', 'CHILE', 'CO'], paisesSinOperacion: ['JAPON', 'ESPAÑA', 'INDIA', 'RUSIA']});
+```
+- Se requiere registrar el personal que trabaja en cada empresa: id, nacionalidad, país de residencia, nombres, dirección, lengua materna.
+- Del personal se desea distinguir entre tres categorías: pilotos, personal de tierra y personal de apoyo.
+- De cada piloto se desea almacenar el tipo de licencia con que cuenta y la última evaluación que realizó como piloto.
+```cypher
+CREATE (p:Personal {id: 'P1', nacionalidad: 'MX', paisResidencia: 'México', nombres: 'Juan Pérez', direccion: 'Calle X', lenguaMaterna: 'Español', categoria: 'Piloto', licencia: 'ATPL', ultimaEvaluacion: '2024-01-15'});
+```
+- Del personal de apoyo se requiere almacenar los idiomas que habla y su número de teléfono.
+```cypher
+CREATE (p:Personal {id: 'P1', nacionalidad: 'MX', paisResidencia: 'México', nombres: 'Juan Pérez', direccion: 'Calle X', lenguaMaterna: 'Español', categoria: 'Apoyo', idiomas:['Ingles', 'Frances']});
+```
+- De cada personal de tierra se requiere almacenar las tareas que realiza y las certificaciones laborales que tiene
+```cypher
+CREATE (p:Personal {id: 'P1', nacionalidad: 'MX', paisResidencia: 'México', nombres: 'Juan Pérez', direccion: 'Calle X', lenguaMaterna: 'Español', categoria: 'Personal de  Tierra', tareas: [], certificaciones: []});
+```
+- De cada avión se desea almacenar id, modelo, millas de autonomía (sin repostar combustible), número de pasajeros, número de integrantes de tripulación para operar el avión, fecha de la última revisión técnica del avión. También se desea conocer a qué ruta está asignado un avión
+```cypher
+CREATE (a:Avion {id: 'AV1', modelo: 'Boeing 747', autonomia: 6000, numeroPasajeros: 300, tripulacion: 10, ultimaRevision: '2023-12-20'});
+```
+- Cada ruta cuenta con código, origen y destino, y duración del vuelo. Estas rutas son asignadas a los pilotos. Un piloto puede tener asignadas (permiso para volar) muchas rutas.
+```cypher
+CREATE (r:Ruta {codigo: 'R123', origen: 'Ciudad X', destino: 'Ciudad Y', duracion: 3.5, avion: 'AV1', escalas:[1,2,3,4]});
+```
+1. Consultas:
+- Q00. Script del escenario de datos.
+```cypher
 // Región Norte
 MERGE (ae1:Aeropuerto {id: 1, nombre: 'A. I. Gral. Roberto Fierro Villalobos', ciudad: 'Chihuahua', estado: 'Chihuahua', direccion: 'Blvd. Juan Pablo II 14, 31390 Chihuahua, Chih', pistas: 15})
 
@@ -107,9 +153,9 @@ MERGE (p9)-[:TRABAJA]->(e9)
 MERGE (p10)-[:TRABAJA]->(e10)
 
 // Personal de Tierra
-MERGE (p11:Personal {id: 'P011', nacionalidad: 'MX', paisResidencia: 'México', nombres: 'Roberto Jiménez', direccion: 'Calle 11', lenguaMaterna: 'Español', categoria: 'Personal de Tierra', tareas: ['Mantenimiento', 'Revisión de seguridad'], certificaciones: ['Técnico en Mantenimiento de Aeronaves']})
-MERGE (p12:Personal {id: 'P012', nacionalidad: 'CO', paisResidencia: 'Colombia', nombres: 'Sara Gutiérrez', direccion: 'Calle 12', lenguaMaterna: 'Español', categoria: 'Personal de Tierra', tareas: ['Inspección de carga', 'Control de tráfico en tierra'], certificaciones: ['Operador de Carga', 'Seguridad en Aeropuertos']})
-MERGE (p13:Personal {id: 'P013', nacionalidad: 'US', paisResidencia: 'Estados Unidos', nombres: 'Michael Johnson', direccion: 'Street 13', lenguaMaterna: 'Inglés', categoria: 'Personal de Tierra', tareas: ['Mantenimiento', 'Inspección de equipaje'], certificaciones: ['Técnico en Seguridad de Aeronaves']})
+MERGE (p11:Personal {id: 'P011', nacionalidad: 'MX', paisResidencia: 'México', nombres: 'Roberto Jiménez', direccion: 'Calle 11', lenguaMaterna: 'Español', categoria: 'Personal de Tierra', tareas: ['Mantenimiento', 'Revisión de seguridad'], certificaciones: ['Técnico en Mantenimiento de Aeronaves', 'Técnico en Seguridad de Aeronaves', 'Seguridad en Aeropuertos']})
+MERGE (p12:Personal {id: 'P012', nacionalidad: 'CO', paisResidencia: 'Colombia', nombres: 'Sara Gutiérrez', direccion: 'Calle 12', lenguaMaterna: 'Español', categoria: 'Personal de Tierra', tareas: ['Inspección de carga', 'Control de tráfico en tierra'], certificaciones: ['Operador de Carga', 'Seguridad en Aeropuertos', 'Técnico en Seguridad de Aeronaves', 'Operador de Equipos Aeroportuarios']})
+MERGE (p13:Personal {id: 'P013', nacionalidad: 'US', paisResidencia: 'Estados Unidos', nombres: 'Michael Johnson', direccion: 'Street 13', lenguaMaterna: 'Inglés', categoria: 'Personal de Tierra', tareas: ['Mantenimiento', 'Inspección de equipaje'], certificaciones: ['Técnico en Seguridad de Aeronaves', 'Seguridad en Aeropuertos', 'Especialista en Combustible']})
 MERGE (p14:Personal {id: 'P014', nacionalidad: 'DE', paisResidencia: 'Alemania', nombres: 'Johann Becker', direccion: 'Strasse 14', lenguaMaterna: 'Alemán', categoria: 'Personal de Tierra', tareas: ['Mantenimiento de pista', 'Supervisión de equipo de rampa'], certificaciones: ['Operador de Equipos Aeroportuarios']})
 MERGE (p15:Personal {id: 'P015', nacionalidad: 'FR', paisResidencia: 'Francia', nombres: 'Chloe Dubois', direccion: 'Rue 15', lenguaMaterna: 'Francés', categoria: 'Personal de Tierra', tareas: ['Revisión de seguridad', 'Carga de combustible'], certificaciones: ['Seguridad en Aeropuertos', 'Especialista en Combustible']})
 
@@ -146,14 +192,14 @@ MERGE (p24)-[:TRABAJA]->(e6)
 MERGE (p25)-[:TRABAJA]->(e7)
 
 // Personal de Tierra
-MERGE (p26:Personal {id: 'P026', nacionalidad: 'ES', paisResidencia: 'España', nombres: 'Pedro Alonso', direccion: 'Calle 26', lenguaMaterna: 'Español', categoria: 'Personal de Tierra', tareas: ['Carga de equipaje', 'Mantenimiento'], certificaciones: ['Carga en Aeropuertos', 'Mantenimiento Básico']})
-MERGE (p27:Personal {id: 'P027', nacionalidad: 'MX', paisResidencia: 'México', nombres: 'Javier Ruiz', direccion: 'Calle 27', lenguaMaterna: 'Español', categoria: 'Personal de Tierra', tareas: ['Revisión de seguridad', 'Inspección de aeronaves'], certificaciones: ['Seguridad Aeroportuaria', 'Inspección de Aeronaves']})
+MERGE (p26:Personal {id: 'P026', nacionalidad: 'ES', paisResidencia: 'España', nombres: 'Pedro Alonso', direccion: 'Calle 26', lenguaMaterna: 'Español', categoria: 'Personal de Tierra', tareas: ['Carga de equipaje', 'Mantenimiento'], certificaciones: ['Carga en Aeropuertos', 'Mantenimiento Básico', 'Seguridad en Aeropuertos', 'Especialista en Combustible']})
+MERGE (p27:Personal {id: 'P027', nacionalidad: 'MX', paisResidencia: 'México', nombres: 'Javier Ruiz', direccion: 'Calle 27', lenguaMaterna: 'Español', categoria: 'Personal de Tierra', tareas: ['Revisión de seguridad', 'Inspección de aeronaves'], certificaciones: ['Seguridad Aeroportuaria', 'Inspección de Aeronaves', 'Carga en Aeropuertos', 'Mantenimiento Básico']})
 MERGE (p28:Personal {id: 'P028', nacionalidad: 'JP', paisResidencia: 'Japón', nombres: 'Yuki Nakamura', direccion: '街道 28', lenguaMaterna: 'Japonés', categoria: 'Personal de Tierra', tareas: ['Carga de combustible', 'Revisión de pista'], certificaciones: ['Combustible en Aeronaves', 'Operaciones en Pista']})
 MERGE (p29:Personal {id: 'P029', nacionalidad: 'US', paisResidencia: 'Estados Unidos', nombres: 'Sarah Davis', direccion: 'Street 29', lenguaMaterna: 'Inglés', categoria: 'Personal de Tierra', tareas: ['Mantenimiento', 'Control de equipo en rampa'], certificaciones: ['Mantenimiento en Aeronaves', 'Equipo Aeroportuario']})
 MERGE (p30:Personal {id: 'P030', nacionalidad: 'GB', paisResidencia: 'Reino Unido', nombres: 'Harry Johnson', direccion: 'Road 30', lenguaMaterna: 'Inglés', categoria: 'Personal de Tierra', tareas: ['Inspección de carga', 'Supervisión de seguridad'], certificaciones: ['Seguridad Aeroportuaria', 'Control de Carga']})
 
 MERGE (p26)-[:TRABAJA]->(e8)
-MERGE (p27)-[:TRABAJA]->(e9)
+MERGE (p27)-[:TRABAJA]->(e1)
 MERGE (p28)-[:TRABAJA]->(e10)
 MERGE (p29)-[:TRABAJA]->(e11)
 MERGE (p30)-[:TRABAJA]->(e12)
@@ -277,6 +323,59 @@ MERGE (e18)-[:POSEE]->(a23)
 MERGE (e18)-[:POSEE]->(a24)
 MERGE (e18)-[:POSEE]->(a25)
 
+MERGE (e1)-[:POSEE]->(a9)
+MERGE (e1)-[:POSEE]->(a10)
+MERGE (e1)-[:POSEE]->(a11)
+MERGE (e1)-[:POSEE]->(a12)
+MERGE (e1)-[:POSEE]->(a12)
+MERGE (e1)-[:POSEE]->(a14)
+MERGE (e1)-[:POSEE]->(a15)
+MERGE (e1)-[:POSEE]->(a16)
+MERGE (e1)-[:POSEE]->(a17)
+MERGE (e1)-[:POSEE]->(a18)
+MERGE (e1)-[:POSEE]->(a19)
+MERGE (e1)-[:POSEE]->(a20)
+MERGE (e1)-[:POSEE]->(a21)
+MERGE (e1)-[:POSEE]->(a22)
+MERGE (e1)-[:POSEE]->(a23)
+MERGE (e1)-[:POSEE]->(a24)
+MERGE (e1)-[:POSEE]->(a25)
+MERGE (e1)-[:POSEE]->(a8)
+MERGE (e1)-[:POSEE]->(a7)
+
+MERGE (e2)-[:POSEE]->(a11)
+MERGE (e2)-[:POSEE]->(a12)
+MERGE (e2)-[:POSEE]->(a12)
+MERGE (e2)-[:POSEE]->(a14)
+MERGE (e2)-[:POSEE]->(a15)
+MERGE (e2)-[:POSEE]->(a16)
+MERGE (e2)-[:POSEE]->(a17)
+MERGE (e2)-[:POSEE]->(a18)
+MERGE (e2)-[:POSEE]->(a19)
+MERGE (e2)-[:POSEE]->(a20)
+MERGE (e2)-[:POSEE]->(a21)
+MERGE (e2)-[:POSEE]->(a22)
+MERGE (e2)-[:POSEE]->(a23)
+MERGE (e2)-[:POSEE]->(a24)
+MERGE (e2)-[:POSEE]->(a25)
+MERGE (e2)-[:POSEE]->(a8)
+MERGE (e2)-[:POSEE]->(a7)
+
+MERGE (e3)-[:POSEE]->(a15)
+MERGE (e3)-[:POSEE]->(a16)
+MERGE (e3)-[:POSEE]->(a17)
+MERGE (e3)-[:POSEE]->(a18)
+MERGE (e3)-[:POSEE]->(a19)
+MERGE (e3)-[:POSEE]->(a20)
+MERGE (e3)-[:POSEE]->(a21)
+MERGE (e3)-[:POSEE]->(a22)
+MERGE (e3)-[:POSEE]->(a23)
+MERGE (e3)-[:POSEE]->(a24)
+MERGE (e3)-[:POSEE]->(a25)
+MERGE (e3)-[:POSEE]->(a8)
+MERGE (e3)-[:POSEE]->(a7)
+
+
 // Asignar aviones a aeropuertos
 MERGE (a1)-[:OPERA_EN]->(ae1)
 MERGE (a2)-[:OPERA_EN]->(ae2)
@@ -381,3 +480,194 @@ MERGE (a22)-[:OPERA_EN]->(ae8)
 MERGE (a23)-[:OPERA_EN]->(ae9)
 MERGE (a24)-[:OPERA_EN]->(ae1)
 MERGE (a25)-[:OPERA_EN]->(ae2)
+
+
+// Rutas
+MERGE (r1:Ruta {codigo: 'R001', origen: 'Chihuahua', destino: 'Aguascalientes', duracion: 2.5, avion: 'AV1', escalas:[1, 3]})
+MERGE (r2:Ruta {codigo: 'R002', origen: 'Toluca', destino: 'Querétaro', duracion: 5, avion: 'AV2', escalas:[2, 5, 6]})
+MERGE (r3:Ruta {codigo: 'R003', origen: 'La Paz', destino: 'Mexicali', duracion: 1.5, avion: 'AV3', escalas:[7]})
+MERGE (r4:Ruta {codigo: 'R004', origen: 'Tuxtla Gutiérrez', destino: 'Cancún', duracion: 4, avion: 'AV4', escalas:[4, 6, 9]})
+MERGE (r5:Ruta {codigo: 'R005', origen: 'Oaxaca', destino: 'Chihuahua', duracion: 3, avion: 'AV5', escalas:[8, 2]})
+MERGE (r6:Ruta {codigo: 'R006', origen: 'Aguascalientes', destino: 'Toluca', duracion: 6.5, avion: 'AV6', escalas:[1, 4, 7, 9]})
+MERGE (r7:Ruta {codigo: 'R007', origen: 'Querétaro', destino: 'La Paz', duracion: 5.2, avion: 'AV7', escalas:[3, 8, 10]})
+MERGE (r8:Ruta {codigo: 'R008', origen: 'Mexicali', destino: 'Tuxtla Gutiérrez', duracion: 2, avion: 'AV8', escalas:[5]})
+MERGE (r9:Ruta {codigo: 'R009', origen: 'Cancún', destino: 'Oaxaca', duracion: 3.8, avion: 'AV9', escalas:[2, 6]})
+MERGE (r10:Ruta {codigo: 'R010', origen: 'Oaxaca', destino: 'Tuxtla Gutiérrez', duracion: 7.1, avion: 'AV10', escalas:[1, 5, 8]})
+MERGE (r11:Ruta {codigo: 'R011', origen: 'La Paz', destino: 'Toluca', duracion: 2.5, avion: 'AV1', escalas:[1, 3]})
+MERGE (r12:Ruta {codigo: 'R012', origen: 'Chihuahua', destino: 'Cancún', duracion: 5, avion: 'AV2', escalas:[2, 5, 6]})
+MERGE (r13:Ruta {codigo: 'R013', origen: 'Mexicali', destino: 'Querétaro', duracion: 1.5, avion: 'AV3', escalas:[7]})
+MERGE (r14:Ruta {codigo: 'R014', origen: 'Chihuahua', destino: 'Toluca', duracion: 4, avion: 'AV4', escalas:[4, 6, 9]})
+MERGE (r15:Ruta {codigo: 'R015', origen: 'La Paz', destino: 'Tuxtla Gutiérrez', duracion: 3, avion: 'AV5', escalas:[8, 2]})
+MERGE (r16:Ruta {codigo: 'R016', origen: 'Oaxaca', destino: 'Aguascalientes', duracion: 6.5, avion: 'AV6', escalas:[1, 4, 7, 9]})
+MERGE (r17:Ruta {codigo: 'R017', origen: 'Querétaro', destino: 'Mexicali', duracion: 5.2, avion: 'AV7', escalas:[3, 8, 10]})
+MERGE (r18:Ruta {codigo: 'R018', origen: 'Cancún', destino: 'Chihuahua', duracion: 2, avion: 'AV8', escalas:[5]})
+MERGE (r19:Ruta {codigo: 'R019', origen: 'La Paz', destino: 'Aguascalientes', duracion: 3.8, avion: 'AV9', escalas:[2, 6]})
+MERGE (r20:Ruta {codigo: 'R020', origen: 'Querétaro', destino: 'Toluca', duracion: 7.1, avion: 'AV10', escalas:[1, 5, 8]})
+
+MERGE (p1)-[:PERMISO_RUTA]->(r1)
+MERGE (p2)-[:PERMISO_RUTA]->(r2)
+MERGE (p3)-[:PERMISO_RUTA]->(r3)
+MERGE (p4)-[:PERMISO_RUTA]->(r4)
+MERGE (p5)-[:PERMISO_RUTA]->(r5)
+MERGE (p16)-[:PERMISO_RUTA]->(r6)
+MERGE (p17)-[:PERMISO_RUTA]->(r7)
+MERGE (p18)-[:PERMISO_RUTA]->(r8)
+MERGE (p19)-[:PERMISO_RUTA]->(r9)
+MERGE (p20)-[:PERMISO_RUTA]->(r10)
+MERGE (p31)-[:PERMISO_RUTA]->(r11)
+MERGE (p32)-[:PERMISO_RUTA]->(r12)
+MERGE (p33)-[:PERMISO_RUTA]->(r13)
+MERGE (p34)-[:PERMISO_RUTA]->(r14)
+MERGE (p35)-[:PERMISO_RUTA]->(r15)
+
+MERGE (p1)-[:PERMISO_RUTA]->(r16)
+MERGE (p2)-[:PERMISO_RUTA]->(r17)
+MERGE (p3)-[:PERMISO_RUTA]->(r18)
+MERGE (p4)-[:PERMISO_RUTA]->(r19)
+MERGE (p5)-[:PERMISO_RUTA]->(r20)
+MERGE (p16)-[:PERMISO_RUTA]->(r1)
+MERGE (p17)-[:PERMISO_RUTA]->(r2)
+MERGE (p18)-[:PERMISO_RUTA]->(r3)
+MERGE (p19)-[:PERMISO_RUTA]->(r4)
+MERGE (p20)-[:PERMISO_RUTA]->(r5)
+MERGE (p31)-[:PERMISO_RUTA]->(r6)
+MERGE (p32)-[:PERMISO_RUTA]->(r7)
+MERGE (p33)-[:PERMISO_RUTA]->(r8)
+MERGE (p34)-[:PERMISO_RUTA]->(r9)
+MERGE (p35)-[:PERMISO_RUTA]->(r10)
+
+MERGE (p1)-[:PERMISO_RUTA]->(r11)
+MERGE (p2)-[:PERMISO_RUTA]->(r12)
+MERGE (p3)-[:PERMISO_RUTA]->(r13)
+MERGE (p4)-[:PERMISO_RUTA]->(r14)
+MERGE (p5)-[:PERMISO_RUTA]->(r15)
+MERGE (p16)-[:PERMISO_RUTA]->(r16)
+MERGE (p17)-[:PERMISO_RUTA]->(r17)
+MERGE (p18)-[:PERMISO_RUTA]->(r18)
+MERGE (p19)-[:PERMISO_RUTA]->(r19)
+MERGE (p20)-[:PERMISO_RUTA]->(r20)
+MERGE (p31)-[:PERMISO_RUTA]->(r1)
+MERGE (p32)-[:PERMISO_RUTA]->(r2)
+MERGE (p33)-[:PERMISO_RUTA]->(r3)
+MERGE (p34)-[:PERMISO_RUTA]->(r4)
+MERGE (p35)-[:PERMISO_RUTA]->(r5)
+
+MERGE (p1)-[:PERMISO_RUTA]->(r6)
+MERGE (p2)-[:PERMISO_RUTA]->(r7)
+MERGE (p3)-[:PERMISO_RUTA]->(r8)
+MERGE (p4)-[:PERMISO_RUTA]->(r9)
+MERGE (p5)-[:PERMISO_RUTA]->(r10)
+MERGE (p16)-[:PERMISO_RUTA]->(r11)
+MERGE (p17)-[:PERMISO_RUTA]->(r12)
+MERGE (p18)-[:PERMISO_RUTA]->(r13)
+MERGE (p19)-[:PERMISO_RUTA]->(r14)
+MERGE (p20)-[:PERMISO_RUTA]->(r15)
+MERGE (p31)-[:PERMISO_RUTA]->(r16)
+MERGE (p32)-[:PERMISO_RUTA]->(r17)
+MERGE (p33)-[:PERMISO_RUTA]->(r18)
+MERGE (p34)-[:PERMISO_RUTA]->(r19)
+MERGE (p35)-[:PERMISO_RUTA]->(r20)
+```
+- Q01. Obtener la lista de aeropuertos con más de 3 pistas
+```cypher
+MATCH (a:Aeropuerto)
+WHERE a.pistas > 3
+RETURN a;
+```
+- Q02. Obtener la lista de empresas que trabajan en un aeropuerto específico
+```cypher
+MATCH (a:Aeropuerto {id: 'A1'})<-[:OPERA]-(e:Empresa)
+RETURN a,e;
+```
+- Q03. Obtener la lista de aviones con una autonomía de vuelo mayor a 5000 millas.
+```cypher
+MATCH (a:Avion)
+WHERE a.autonomia > 5000
+RETURN a.id, a.modelo, a.autonomia;
+```
+- Q04. Obtener la lista de pilotos que tienen licencia para volar una ruta específica
+```cypher
+MATCH (p:Personal {categoria: 'Piloto'})-[:PERMISO_RUTA]->(r:Ruta {codigo: 'R003'})
+RETURN p.nombres;
+```
+- Q05. Obtener la lista de países en los que una empresa internacional no puede operar
+```cypher
+MATCH (e:Empresa {RFC: 'RFC1234', tipo: 'Internacional'})
+RETURN e.paisesNoOperar;
+```
+- Q06. Eliminar una empresa que ya no trabaja en un aeropuerto específico. Eliminar también la información asociada
+```cypher
+MATCH (a:Aeropuerto {id: 'A1'})<-[:OPERA]-(e:Empresa {RFC: 'RFC1234'})
+DETACH DELETE e;
+```
+- Q07. Encontrar las empresas que tienen más de 10 aviones y que trabajan en al menos dos aeropuertos diferentes.
+```cypher
+MATCH (e:Empresa)-[:POSEE]->(a:Avion)
+MATCH (e)-[:OPERA]->(ae:Aeropuerto)
+WITH e, COUNT(DISTINCT a) AS numAviones, COUNT(DISTINCT ae) AS numAeropuertos
+WHERE numAviones > 10 AND numAeropuertos >= 2
+RETURN e.nombre AS empresa, numAviones, numAeropuertos
+```
+- Q08. Obtener la lista de rutas que son operadas por pilotos con licencia de tipo ATPL y que tienen una duración de vuelo mayor a 2 horas
+```cypher
+MATCH (p:Personal {categoria: 'Piloto', licencia: 'ATPL'})-[:PERMISO_RUTA]->(r:Ruta)
+WHERE r.duracion > 2
+RETURN r.codigo, r.duracion;
+```
+- Q09. Obtener la lista de personal de tierra que tiene más de 3 certificaciones y que trabaja para empresas que tienen más de 20 aviones.
+```cypher
+MATCH (p:Personal {categoria: 'Personal de Tierra'})-[:TRABAJA]->(e:Empresa)
+MATCH (e)-[:POSEE]->(a:Avion)
+WITH e, p, SIZE(p.certificaciones) AS numCertificaciones, COUNT(DISTINCT a) AS numAviones
+WHERE numCertificaciones > 3 AND numAviones > 20
+RETURN p.nombres, p.certificaciones;
+```
+- Q10. Encontrar las rutas que son operadas por al menos dos empresas diferentes y que tienen una escala en un aeropuerto específico. (NO)
+```cypher
+MATCH (e1:Empresa)-[:OPERA]->(r:Ruta)<-[:OPERA]-(e2:Empresa), (a:Aeropuerto {id: 'A1'})
+WHERE e1 <> e2
+RETURN r.codigo, a.nombre;
+```
+- Q11. Agregar una nueva ruta de vuelo entre dos aeropuertos que implique tres escalas (tres nodos intermedios) entre el origen y el destino. (NO)
+```cypher
+CREATE (r:Ruta {codigo: 'R456', origen: 'Querétaro', destino: 'Tuxtla Gutiérrez', escalas: [4, 5, 6]});
+```
+- Q12. Por cuestiones de política laboral una empresa requiere dar de baja del sistema a todos sus pilotos.
+```cypher
+MATCH (e:Empresa {RFC: 'NAT001'})<-[:TRABAJA]-(n) 
+WHERE n.categoria = 'Piloto' 
+DETACH DELETE n RETURN e,n
+```
+- Q13. Una venta de activos implica que todos los vuelos, pilotos, personal, etc, deben pasar de una empresa a otra.
+```cypher
+MATCH (eOld:Empresa {RFC: "NAT001"})
+MATCH (eNew:Empresa {RFC: "NAT002"})
+MATCH (eOld)-[rel:OPERA]->(ae:Aeropuerto)
+MATCH (eOld)-[av:POSEE]->(a:Avion)
+MATCH (eOld)<-[tra:TRABAJA]-(p:Personal)
+MERGE (eNew)-[:OPERA]->(ae)
+MERGE (eNew)-[:POSEE]->(a)
+MERGE (eNew)<-[:TRABAJA]-(p)
+DELETE av
+DELETE rel
+DELETE tra
+DETACH DELETE eOld
+```
+- Q14. Se requiere listar todos los vuelos incluyendo las escalas que realiza cada vuelo.
+```cypher
+MATCH (r:Ruta)
+RETURN r.codigo, r.escalas;
+```
+- Q15. Un aeropuerto será remodelado por lo que el aeropuerto debe ser eliminado y todas sus operaciones deben ser reasignadas.
+```cypher
+MATCH (aeOld:Aeropuerto {id: 3})
+MATCH (aeNew:Aeropuerto {id: 5})
+MATCH (e:Empresa)-[rel:OPERA]->(aeOld)
+MATCH (a:Avion)-[vue:OPERA_EN]->(aeOld)
+MERGE (e)-[:OPERA]->(aeNew)
+MERGE (a)-[:OPERA_EN]->(aeNew)
+DELETE rel
+DELETE vue
+WITH aeOld
+DETACH DELETE aeOld
+```

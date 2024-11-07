@@ -28,6 +28,37 @@ const obtenerAeropuertosMedianos = async (req, res) => {
     }
 };
 
+
+const reasignarAeropuerto = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { idOldAe, idNewAe } = req.body;
+
+    try {
+        const result = await session.run(
+            `MATCH (aeOld:Aeropuerto {id: $idOldAe}) MATCH (aeNew:Aeropuerto {id: $idNewAe}) MATCH (e:Empresa)-[rel:OPERA]->(aeOld) MATCH (a:Avion)-[vue:OPERA_EN]->(aeOld) MERGE (e)-[:OPERA]->(aeNew) MERGE (a)-[:OPERA_EN]->(aeNew) DELETE rel DELETE vue WITH aeOld DETACH DELETE aeOld`,
+            { idOldAe, idNewAe }
+        );
+
+        res.data = result;
+
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                idOldAe, 
+                idNewAe, 
+                result
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
 module.exports = {
-    obtenerAeropuertosMedianos
+    obtenerAeropuertosMedianos,
+    reasignarAeropuerto
 }

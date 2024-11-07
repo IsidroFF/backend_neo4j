@@ -13,7 +13,7 @@ services:
 
   redis_stack:
     image: redis/redis-stack
-    container_name: redis_stack
+    container_name: stack2
     ports:
       - "6379:6379"
       - "8001:8001"
@@ -22,14 +22,14 @@ services:
 
   backend_app:
     build: .
-    image: isidroitt/node_neo4j_api:latest
+    image: node_neo4j_api:latest
     container_name: "node_app"
     ports:
       - "3000:3000"
     networks:
       - backend
     environment:
-      REDIS_URL: redis_stack://redis_stack:6379
+      REDIS_URL: stack2
       NEO4J_URL: neo4j://neo_presentacion:7687
     depends_on:
       - redis_stack

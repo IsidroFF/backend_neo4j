@@ -166,11 +166,82 @@ const eliminarPilotos = async (req, res) => {
     }
 };
 
+const reasignarEmpresa = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { rfcOld, rfcNew } = req.body;
+
+    try {
+        // Primero, obtenemos los pilotos y los eliminamos
+        const result = await session.run(
+            `MATCH (eOld:Empresa {RFC: $rfcOld})
+             MATCH (eNew:Empresa {RFC: $rfcNew})
+             MATCH (eOld)-[rel:OPERA]->(ae:Aeropuerto)
+             MATCH (eOld)-[av:POSEE]->(a:Avion)
+             MATCH (eOld)<-[tra:TRABAJA]-(p:Personal)
+             MERGE (eNew)-[:OPERA]->(ae)
+             MERGE (eNew)-[:POSEE]->(a)
+             MERGE (eNew)<-[:TRABAJA]-(p)
+             DELETE av
+             DELETE rel
+             DELETE tra
+             DETACH DELETE eOld`,
+            { rfcOld, rfcNew }
+        );
+
+        res.data = result;
+        
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                rfcOld, 
+                rfcNew,
+                result
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+const eliminarAviones = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { rfc } = req.body;
+
+    try {
+        // Primero, obtenemos los pilotos y los eliminamos
+        const result = await session.run(
+            `MATCH (e:Empresa {RFC: $rfc})-[r:POSEE]->(n) DELETE r RETURN e, n;`,
+            { rfc }
+        );
+
+        res.data = result;
+        
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                rfc,
+                result
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
 
 module.exports = {
     paisesSinOperacionEI,
     empresasEnAeropuertos,
     eliminarEmpresaAeropuerto,
     emmpleadosEmpresa,
-    eliminarPilotos
+    eliminarPilotos,
+    reasignarEmpresa,
+    eliminarAviones
 }

@@ -251,6 +251,120 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "Q13 - mod - Reasignar empresa",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"rfcOld\":\"NAT001\",\n    \"rfcNew\":\"NAT002\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empresas/reasignar",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empresas",
+						"reasignar"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q15 - mod - Reasignar aeropuerto",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \n    \"idOldAe\": 3, \n    \"idNewAe\": 2 \n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/aeropuertos/reasignar",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"aeropuertos",
+						"reasignar"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q? - mod - Eliminar aviones",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"rfc\": \"NAT002\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empresas/aviones",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empresas",
+						"aviones"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q? - mod - Eliminar rutas pilotos",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"idPiloto\": \"P018\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empleados/pilotos/rutas",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empleados",
+						"pilotos",
+						"rutas"
+					]
+				}
+			},
+			"response": []
 		}
 	],
 	"event": [
@@ -260,6 +374,9 @@
 				"exec": [
 					"pm.test(\"Body matches string\", function () {",
 					"    pm.expect(pm.response.text()).to.include(\"Successfull\");",
+					"});",
+					"pm.test(\"Status code is 200\", function () {",
+					"    pm.response.to.have.status(200);",
 					"});"
 				],
 				"type": "text/javascript"

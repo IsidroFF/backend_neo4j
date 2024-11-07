@@ -6,13 +6,18 @@ const {
     empresasEnAeropuertos, 
     eliminarEmpresaAeropuerto, 
     emmpleadosEmpresa, 
-    eliminarPilotos 
+    eliminarPilotos, 
+    reasignarEmpresa,
+    eliminarAviones
 } = require('../controllers/empresas.controllers.js');
 
 router.get('/int/nopaises', paisesSinOperacionEI);
 router.get('/aeropuertos', empresasEnAeropuertos);
-router.delete('/aeropuertos', eliminarEmpresaAeropuerto);
 router.get('/empleados', emmpleadosEmpresa);
+
+router.delete('/aeropuertos', eliminarEmpresaAeropuerto);
 router.delete('/empleados/pilotos', eliminarPilotos);
+router.delete('/reasignar', reasignarEmpresa);
+router.delete('/aviones', eliminarAviones);
 
 module.exports = router 

@@ -30,6 +30,35 @@ const certificados = async (req, res) => {
     }
 };
 
+const eliminarRutasPilotos = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { idPiloto } = req.body;
+
+    try {
+        const result = await session.run(
+            `MATCH (p:Personal {categoria:"Piloto", id: $idPiloto })-[rel:PERMISO_RUTA]->(n) DETACH DELETE rel RETURN p,n`,
+            { idPiloto }
+        );
+
+        res.data = result;
+        
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                idPiloto,
+                result
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
 module.exports = {
-    certificados
+    certificados,
+    eliminarRutasPilotos
 }
