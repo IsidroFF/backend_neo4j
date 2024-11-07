@@ -21,8 +21,7 @@ services:
       - backend
 
   backend_app:
-    build: .
-    image: node_neo4j_api:latest
+    image: isidroitt/node_neo4j_api:latest
     container_name: "node_app"
     ports:
       - "3000:3000"
