@@ -1,4 +1,4 @@
-### Gestión de Aeropuertos. Una instancia gubernamental requiere una BD que cumpla lo siguiente.
+## Gestión de Aeropuertos. Una instancia gubernamental requiere una BD que cumpla lo siguiente.
 
 - De cada aeropuerto se desea guardar un id, nombre, ciudad, dirección, número de pistas. En cada aeropuerto trabajan varias empresas autorizadas para hacer uso del aeropuerto.
 ``` cypher
@@ -670,4 +670,1078 @@ DELETE rel
 DELETE vue
 WITH aeOld
 DETACH DELETE aeOld
+```
+
+---
+## Código del backend
+[Repo de github](https://github.com/IsidroFF/backend_neo4j)  
+Estructura de carpetas y archivos
+- src
+	- cache
+		- logger.js
+	- controllers
+		- aeropuertos.controllers.js
+		- aviones.controllers.js
+		- empleados.controllers.js
+		- empresas.controllers.js
+	- database
+		- neo4j.database.js
+		- redis.database.js
+	- routes
+		- aeropuertos.routes.js
+		- aviones.routes.js
+		- empleados.routes.js
+		- empresas.routes.js
+	- app.js
+	- server.js
+- .env
+- docker-compose.yml
+
+### src/cache/logger.js
+```js
+const client = require('../database/redis.database')
+
+// Exportar una función middleware que se ejecutará en cada solicitud
+module.exports = (req, res, next) => {
+    res.on('finish', async () => {
+
+        let fecha = new Date();
+
+        const key = `${req.method}: ${fecha.toLocaleDateString()}: ${fecha.getHours()}-${fecha.getMinutes()}-${fecha.getSeconds()}: ${req.originalUrl}`;
+        const valor = JSON.stringify({
+            clave: key,
+            time: new Date(),
+            req: {
+                method: req.method,
+                url: req.originalUrl,
+                headers: req.headers,
+                body: req.body
+            },
+            res: {
+                statusCode: res.statusCode,
+                statusMessage: res.statusMessage,
+                response: req.method === 'GET' ? res.data : null
+            }
+        });
+
+        await client.sendCommand([
+            'JSON.SET',
+            key,
+            '.',
+            valor
+        ]);
+    });
+    next();
+};
+```
+
+### src/controllers/aeropuertos.controllers.js
+```js
+const neo4jConnection = require('../database/neo4j.database.js')
+
+const obtenerAeropuertosMedianos = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { pistas } = req.body;
+
+    try {
+        const result = await session.run(
+            'MATCH (a:Aeropuerto) WHERE a.pistas > $pistas RETURN a;',
+            { pistas }
+        );
+
+        const Aeropuertos = result.records.map(record => record.get('a').properties);
+
+        res.data = Aeropuertos;
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                pistas,
+                Aeropuertos
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+
+const reasignarAeropuerto = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { idOldAe, idNewAe } = req.body;
+
+    try {
+        const result = await session.run(
+            `MATCH (aeOld:Aeropuerto {id: $idOldAe}) MATCH (aeNew:Aeropuerto {id: $idNewAe}) MATCH (e:Empresa)-[rel:OPERA]->(aeOld) MATCH (a:Avion)-[vue:OPERA_EN]->(aeOld) MERGE (e)-[:OPERA]->(aeNew) MERGE (a)-[:OPERA_EN]->(aeNew) DELETE rel DELETE vue WITH aeOld DETACH DELETE aeOld`,
+            { idOldAe, idNewAe }
+        );
+
+        res.data = result;
+
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                idOldAe, 
+                idNewAe, 
+                result
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+module.exports = {
+    obtenerAeropuertosMedianos,
+    reasignarAeropuerto
+}
+
+```
+### src/controllers/aviones.controllers.js
+```js
+const neo4jConnection = require('../database/neo4j.database.js')
+
+const autonomiaAvionres = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { autonomia } = req.body;
+
+    try {
+        const result = await session.run(
+            'MATCH (a:Avion) WHERE a.autonomia > $autonomia RETURN a',
+            { autonomia }
+        );
+
+        const Aviones = result.records.map(record => record.get('a').properties);
+
+        res.data = Aviones;
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                autonomia,
+                Aviones
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+module.exports = {
+    autonomiaAvionres
+}
+
+```
+### src/controllers/empleados.controllers.js
+```js
+const neo4jConnection = require('../database/neo4j.database.js')
+
+const certificados = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { id } = req.body;
+
+    try {
+        const result = await session.run(
+            `MATCH (per:Personal { id: $id}) RETURN per.certificaciones`,
+            { id }
+        );
+
+        const certificaciones = result.records.map(record => record.get('per.certificaciones'));
+
+        res.data = certificaciones;
+
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                id,
+                certificaciones
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+const eliminarRutasPilotos = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { idPiloto } = req.body;
+
+    try {
+        const result = await session.run(
+            `MATCH (p:Personal {categoria:"Piloto", id: $idPiloto })-[rel:PERMISO_RUTA]->(n) DETACH DELETE rel RETURN p,n`,
+            { idPiloto }
+        );
+
+        res.data = result;
+        
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                idPiloto,
+                result
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+module.exports = {
+    certificados,
+    eliminarRutasPilotos
+}
+```
+### src/controllers/empresas.controllers.js
+```js
+const neo4jConnection = require('../database/neo4j.database.js')
+
+const paisesSinOperacionEI = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { rfc } = req.body;
+
+    try {
+        const result = await session.run(
+            `MATCH (e:Empresa {RFC: $rfc, tipo: 'Internacional'}) RETURN e.paisesSinOperacion AS paisesSinOperacion;`,
+            { rfc }
+        );
+
+        const paisesSinOperacion = result.records.map(record => record.get('paisesSinOperacion'));
+
+        res.data = paisesSinOperacion;
+
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                rfc,
+                paisesSinOperacion
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+const empresasEnAeropuertos = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { id } = req.body;
+
+    try {
+        const result = await session.run(
+            `MATCH (a:Aeropuerto {id: $id})<-[:OPERA]-(e:Empresa) RETURN e.nombre`,
+            { id }
+        );
+
+        const empresasOperaAeropuerto = result.records.map(record => record.get('e.nombre'));
+
+        res.data = empresasOperaAeropuerto;
+
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                id,
+                empresasOperaAeropuerto
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+const eliminarEmpresaAeropuerto = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { idAeropuerto, rfcEmpresa } = req.body;
+
+    try {
+        const result = await session.run(
+            `MATCH (a:Aeropuerto {id: $idAeropuerto })<-[rel:OPERA]-(e:Empresa {RFC: $rfcEmpresa}) DETACH DELETE e;`,
+            { idAeropuerto, rfcEmpresa }
+        );
+        
+        const comprobacion = await session.run(
+            `MATCH (a:Aeropuerto {id: $idAeropuerto})<-[:OPERA]-(e:Empresa) RETURN e.nombre`,
+            { idAeropuerto }
+        );
+
+        const empresasOperaAeropuerto = comprobacion.records.map(record => record.get('e.nombre'));
+
+        res.data = empresasOperaAeropuerto;
+
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                idAeropuerto, 
+                rfcEmpresa,
+                empresasOperaAeropuerto
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+const emmpleadosEmpresa = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { rfc } = req.body;
+
+    try {
+        const result = await session.run(
+            `MATCH (e:Empresa {RFC: $rfc })<-[:TRABAJA]-(n) RETURN n.nombres`,
+            { rfc }
+        );
+
+        const listaEmplados = result.records.map(record => record.get('n.nombres'));
+
+        res.data = listaEmplados;
+
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                rfc,
+                listaEmplados
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+const eliminarPilotos = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { rfc } = req.body;
+
+    try {
+        // Primero, obtenemos los pilotos y los eliminamos
+        const eliminarResult = await session.run(
+            `MATCH (e:Empresa {RFC: $rfc})<-[:TRABAJA]-(n) WHERE n.categoria = 'Piloto' DETACH DELETE n RETURN e`,
+            { rfc }
+        );
+
+        // Luego, buscamos los empleados restantes (excluyendo pilotos)
+        const result = await session.run(
+            `MATCH (e:Empresa {RFC: $rfc})<-[:TRABAJA]-(n) RETURN n.nombres AS nombres, n.categoria AS categoria`,
+            { rfc }
+        );
+
+        const listaEmpleados = result.records.map(record => ({
+            nombres: record.get('nombres'),
+            categoria: record.get('categoria')
+        }));
+
+        res.data = listaEmpleados;
+        
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                rfc,
+                listaEmpleados
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+const reasignarEmpresa = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { rfcOld, rfcNew } = req.body;
+
+    try {
+        // Primero, obtenemos los pilotos y los eliminamos
+        const result = await session.run(
+            `MATCH (eOld:Empresa {RFC: $rfcOld})
+             MATCH (eNew:Empresa {RFC: $rfcNew})
+             MATCH (eOld)-[rel:OPERA]->(ae:Aeropuerto)
+             MATCH (eOld)-[av:POSEE]->(a:Avion)
+             MATCH (eOld)<-[tra:TRABAJA]-(p:Personal)
+             MERGE (eNew)-[:OPERA]->(ae)
+             MERGE (eNew)-[:POSEE]->(a)
+             MERGE (eNew)<-[:TRABAJA]-(p)
+             DELETE av
+             DELETE rel
+             DELETE tra
+             DETACH DELETE eOld`,
+            { rfcOld, rfcNew }
+        );
+
+        res.data = result;
+        
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                rfcOld, 
+                rfcNew,
+                result
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+const eliminarAviones = async (req, res) => {
+    const session = neo4jConnection.session();
+    const { rfc } = req.body;
+
+    try {
+        // Primero, obtenemos los pilotos y los eliminamos
+        const result = await session.run(
+            `MATCH (e:Empresa {RFC: $rfc})-[r:POSEE]->(n) DELETE r RETURN e, n;`,
+            { rfc }
+        );
+
+        res.data = result;
+        
+        res.status(200).json({
+            message: "Successfull",
+            data: {
+                rfc,
+                result
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+        await session.close();
+    }
+};
+
+module.exports = {
+    paisesSinOperacionEI,
+    empresasEnAeropuertos,
+    eliminarEmpresaAeropuerto,
+    emmpleadosEmpresa,
+    eliminarPilotos,
+    reasignarEmpresa,
+    eliminarAviones
+}
+
+```
+### src/database/neo4j.database.js
+```js
+const neo4j = require("neo4j-driver");
+const dotenv = require('dotenv')
+
+dotenv.config()
+
+const NEO4J_URL = process.env.NEO4J_URL
+
+const driver = neo4j.driver(
+    NEO4J_URL,
+    neo4j.auth.basic('neo4j', 'neo4j')
+);
+
+module.exports = driver
+```
+### src/database/redis.database.js
+```js
+const redis = require('redis');
+const dotenv = require('dotenv')
+
+dotenv.config()
+
+const REDIS_URL = process.env.REDIS_URL
+
+const client = redis.createClient({
+    socket: {
+        port: 6379,
+        host: REDIS_URL
+    }
+});
+
+module.exports = client
+```
+### src/routes/aeropuertos.routes.js
+```js
+const express = require('express');
+const router = express.Router();
+
+const { obtenerAeropuertosMedianos, reasignarAeropuerto } = require('../controllers/aeropuertos.controllers.js');
+
+router.get('/med', obtenerAeropuertosMedianos)
+router.delete('/reasignar', reasignarAeropuerto)
+
+module.exports = router 
+```
+### src/routes/aviones.routes.js
+```js
+const express = require('express');
+const router = express.Router();
+
+const { autonomiaAvionres } = require('../controllers/aviones.controllers.js');
+
+router.get('/autonomia', autonomiaAvionres)
+
+module.exports = router 
+```
+### src/routes/empleados.routes.js
+```js
+const express = require('express');
+const router = express.Router();
+
+const { certificados, eliminarRutasPilotos } = require('../controllers/empleados.controllers');
+
+router.get('/certificados', certificados);
+router.delete('/pilotos/rutas', eliminarRutasPilotos);
+
+module.exports = router 
+```
+### src/routes/empresas.routes.js
+```js
+const express = require('express');
+const router = express.Router();
+
+const { 
+    paisesSinOperacionEI, 
+    empresasEnAeropuertos, 
+    eliminarEmpresaAeropuerto, 
+    emmpleadosEmpresa, 
+    eliminarPilotos, 
+    reasignarEmpresa,
+    eliminarAviones
+} = require('../controllers/empresas.controllers.js');
+
+router.get('/int/nopaises', paisesSinOperacionEI);
+router.get('/aeropuertos', empresasEnAeropuertos);
+router.get('/empleados', emmpleadosEmpresa);
+
+router.delete('/aeropuertos', eliminarEmpresaAeropuerto);
+router.delete('/empleados/pilotos', eliminarPilotos);
+router.delete('/reasignar', reasignarEmpresa);
+router.delete('/aviones', eliminarAviones);
+
+module.exports = router 
+```
+### app.js
+```js
+const express = require("express");
+const bodyParser = require('body-parser');
+const app = express();
+const logger = require('./cache/logger');
+
+// Rutas
+const AeropuertosRouter = require('./routes/aeropuertos.routes.js');
+const EmpresaRouter = require('./routes/empresas.routes.js');
+const AvionesRouter = require('./routes/aviones.routes.js');
+const EmpleadosRouter = require('./routes/empleados.routes.js')
+
+//middlewares
+app.use(logger)
+app.use(bodyParser.urlencoded({extended: true }));
+app.use(bodyParser.json());
+
+// Permitir JSON en las peticiones
+app.use(express.json());
+
+// Rutas de NEO4J
+app.use('/aeropuertos', AeropuertosRouter);
+app.use('/empresas', EmpresaRouter);
+app.use('/aviones', AvionesRouter);
+app.use('/empleados', EmpleadosRouter);
+
+// Exportamos la aplicacion de express creada
+module.exports = app
+```
+### server.js
+```js
+// Imports
+const redisConnection = require("./database/redis.database.js");
+const app = require('./app.js')
+const dotenv = require('dotenv');
+
+
+// Configuraciones de las variables de entorno
+dotenv.config();
+const PORT = process.env.PORT;
+
+// Conexión con la base de datos
+redisConnection
+    .on('error', err => console.log('Redis Client Error', err))
+    .connect()
+    .then(() => console.log("Conectado a redis"));
+
+// Ejecución de la aplicación
+app.listen(PORT, () => {
+    console.log('Server en http://localhost:' + PORT);
+});
+
+```
+### .env
+```.env
+REDIS_URL=172.17.0.3
+NEO4J_URL=neo4j://172.17.0.2
+PORT=3000
+```
+### docker-compose.yml
+```yml
+version: '3.9'
+services:
+  neo4j:
+    image: neo4j
+    container_name: neo_presentacion
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=none
+    networks:
+      - backend
+
+  redis_stack:
+    image: redis/redis-stack
+    container_name: stack2
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    networks:
+      - backend
+
+  backend_app:
+    image: isidroitt/node_neo4j_api:latest
+    container_name: "node_app"
+    ports:
+      - "3000:3000"
+    networks:
+      - backend
+    environment:
+      REDIS_URL: stack2
+      NEO4J_URL: neo4j://neo_presentacion:7687
+    depends_on:
+      - redis_stack
+      - neo4j
+
+networks:
+  backend:
+    driver: bridge
+```
+
+## Consultas POSTMAN
+```json
+{
+	"info": {
+		"_postman_id": "e492703c-3a6a-4650-a27b-2d9c3cd8b500",
+		"name": "AeropuertosNeo4J-IAFF",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "29492134"
+	},
+	"item": [
+		{
+			"name": "Q1 - get - Aeropuertos pistas",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"pistas\" : 3\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/aeropuertos/med",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"aeropuertos",
+						"med"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q2 - get - Empresas que operan en aeropuertos",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": 1\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empresas/aeropuertos",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empresas",
+						"aeropuertos"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q3 - get - Autonomia Aviones",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"autonomia\": 5000\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/aviones/autonomia",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"aviones",
+						"autonomia"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q5 - get -Empresas Internacionales",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"rfc\": \"INT006\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/empresas/int/nopaises",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empresas",
+						"int",
+						"nopaises"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q? - get - Empleados empresa",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"rfc\": \"INT002\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empresas/empleados",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empresas",
+						"empleados"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q? - get - Empleado Certificaciones",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": \"P026\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empleados/certificados",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empleados",
+						"certificados"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q6 - mod - Eliminar empresa de aeropuerto",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"idAeropuerto\": 1, \n    \"rfcEmpresa\": \"CON002\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empresas/aeropuertos",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empresas",
+						"aeropuertos"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q12 - mod - Eliminar pilotos",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"rfc\": \"NAT003\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empresas/empleados/pilotos",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empresas",
+						"empleados",
+						"pilotos"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q13 - mod - Reasignar empresa",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"rfcOld\":\"NAT001\",\n    \"rfcNew\":\"NAT002\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empresas/reasignar",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empresas",
+						"reasignar"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q15 - mod - Reasignar aeropuerto",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \n    \"idOldAe\": 3, \n    \"idNewAe\": 2 \n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/aeropuertos/reasignar",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"aeropuertos",
+						"reasignar"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q? - mod - Eliminar aviones",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"rfc\": \"NAT002\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empresas/aviones",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empresas",
+						"aviones"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Q? - mod - Eliminar rutas pilotos",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"idPiloto\": \"P018\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/empleados/pilotos/rutas",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"empleados",
+						"pilotos",
+						"rutas"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "test",
+			"script": {
+				"exec": [
+					"pm.test(\"Body matches string\", function () {",
+					"    pm.expect(pm.response.text()).to.include(\"Successfull\");",
+					"});",
+					"pm.test(\"Status code is 200\", function () {",
+					"    pm.response.to.have.status(200);",
+					"});"
+				],
+				"type": "text/javascript"
+			}
+		}
+	]
+}
 ```
